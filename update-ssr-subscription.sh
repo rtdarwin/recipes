@@ -49,8 +49,8 @@ function b64url-to-b64 () {
 function main () {
     # 拉取订阅
 
-    # lines=`curl ${subscription_addr} | base64 -d | cut -b 7-` # for DEBUG
-    lines=`cat ssr-subscription.base64 | base64 -d | cut -b 7-`
+    lines=`curl ${subscription_addr} | base64 -d | cut -b 7-`
+    # lines=`cat ssr-subscription.base64 | base64 -d | cut -b 7-` # for DEBUG
 
     while read -r line; do
         line=`b64url-to-b64 ${line} | base64 -d`
@@ -68,10 +68,46 @@ function main () {
         obfs_param=`b64url-to-b64 ${obfs_param_b64} | base64 -d`
         protocol_param_b64=`echo ${line} | cut -d '?' -f 2 | cut -d '&' -f 2 | cut -d '=' -f 2`
         protocol_param=`b64url-to-b64 ${protocol_param_b64} | base64 -d`
+        remarks_b64=`echo ${line} | cut -d '?' -f 2 | cut -d '&' -f 3 | cut -d '=' -f 2`
+        remarks=`b64url-to-b64 ${remarks_b64} | base64 -d`
 
         # 2. 拼接本地文件名
 
-        node=`echo ${line} | cut -d '.' -f 1` # hammerss specific
+        # cordcloud.me specific
+        #
+        # Mapping 中文 to english characters
+        #   香港, 台湾, 澳门, 日本, 新加坡, 美国, 俄罗斯, 上海, 深圳, 广州, 伦敦, <etc>
+        #   hk  , tw  , am  , jp  , spg   , us  , rus   , sh  , sz  , gz  , lon , unknown
+        #
+        #   阿里云, 腾讯云, 安畅   , 伯力
+        #   aliyun, tcloud, anchang, bl
+        # Mapping Upper-case characters to Lower-case characters
+        LOWER='abcdefghijklmnopqrstuvwxyz'
+        UPPER='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+        node=`echo ${remarks} | sed -r \
+                                   -e 's/^([^(]*).*$/\1/' \
+                                   -e 's/香港/hk./' \
+                                   -e 's/台湾/tw./' \
+                                   -e 's/澳门/am./' \
+                                   -e 's/日本/jp./' \
+                                   -e 's/新加坡/sgp./' \
+                                   -e 's/美国/us./' \
+                                   -e 's/俄罗斯/rus./' \
+                                   -e 's/上海/sh./' \
+                                   -e 's/深圳/sz./' \
+                                   -e 's/广州/gz./' \
+                                   -e 's/伦敦/lon./' \
+                                                     \
+                                   -e 's/阿里云/aliyun/' \
+                                   -e 's/腾讯云/tcloud/' \
+                                   -e 's/安畅/anchang/' \
+                                   -e 's/伯力/bl/' \
+                                                        \
+                                   -e 's/[^0-9A-Za-z.]+/unknown./' \
+                                   -e "y/${UPPER}/${LOWER}"/ \
+                                   `
+
         port=${server_port}
         echo ${node}-${port}        # DEBUG
         config_file_local="${config_dir}/ssr-local-${node}-${port}.json"
